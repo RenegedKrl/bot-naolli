@@ -153,10 +153,22 @@ module.exports = {
                 .setImage(imageUrl)
                 .setFooter({ text: `⭐ ${favorites.toLocaleString()} favoritos no Anilist` });
 
+            // Verifica se o personagem está na wishlist de alguém
+            const wishes = await getData('wishes.json') || {};
+            let wishPings = [];
+            if (wishes[guildId]) {
+                for (const [wisherId, userWishes] of Object.entries(wishes[guildId])) {
+                    if (userWishes.some(w => charName.toLowerCase().includes(w))) {
+                        wishPings.push(`<@${wisherId}>`);
+                    }
+                }
+            }
+            const wishText = wishPings.length > 0 ? `🌟 Desejo de: ${wishPings.join(', ')}\n` : '';
+
             if (isClaimed) {
                 const owner = message.guild.members.cache.get(isClaimed.ownerId);
                 embed.addFields({ name: '💔 Já pertence a:', value: owner ? owner.user.username : 'Alguém' });
-                await msg.edit({ content: '', embeds: [embed] });
+                await msg.edit({ content: wishText, embeds: [embed] });
 
                 // Lógica da Reação de Kakera (Mudae-style)
                 const kakeraValue = rarity.xp; // Coincide perfeitamente: 500, 250, 100, 50, 10
@@ -185,7 +197,7 @@ module.exports = {
                 return;
             }
 
-            await msg.edit({ content: '💖 Reaja para casar com este personagem!', embeds: [embed] });
+            await msg.edit({ content: `${wishText}💖 Reaja para casar com este personagem!`, embeds: [embed] });
             await msg.react('💖');
 
             const filter    = (reaction, user) => reaction.emoji.name === '💖' && !user.bot;
@@ -210,7 +222,8 @@ module.exports = {
                     name: charName,
                     anime: animeName,
                     imageUrl: imageUrl,
-                    rarity: rarity.name
+                    rarity: rarity.name,
+                    value: rarity.xp
                 };
                 await saveData('gachaConfig.json', currentConfig);
                 await updateLimits(guildId, user.id, 'claims', 1);

@@ -27,9 +27,26 @@ module.exports = {
             return message.reply(`❌ Você não é dono(a) de nenhum personagem que contenha o nome **"${args.join(' ')}"**.`);
         }
 
+        const rarityValues = {
+            '🟡 Lendária': 500,
+            '🟣 Épica': 250,
+            '🔵 Rara': 100,
+            '🟢 Incomum': 50,
+            '⚪ Comum': 10
+        };
+
+        const refundAmount = foundChar.value || rarityValues[foundChar.rarity] || 10;
+
         delete config[guildId][foundId];
         await saveData('gachaConfig.json', config);
 
-        message.reply(`💔 Você se divorciou de **${foundChar.name}**. O personagem agora está livre de novo no servidor!`);
+        let kakeraConfig = await getData('kakeraConfig.json');
+        if (!kakeraConfig[guildId]) kakeraConfig[guildId] = {};
+        if (!kakeraConfig[guildId][message.author.id]) kakeraConfig[guildId][message.author.id] = { balance: 0, badges: [] };
+
+        kakeraConfig[guildId][message.author.id].balance += refundAmount;
+        await saveData('kakeraConfig.json', kakeraConfig);
+
+        message.reply(`💔 Você se divorciou de **${foundChar.name}**.\n💎 Você recebeu **${refundAmount} Kakeras** de volta pelo valor do personagem.`);
     }
 };
