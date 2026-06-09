@@ -3,13 +3,22 @@ const { getData, saveData } = require('../../database');
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
-// Raridade baseada em favoritos do Anilist (sem dependência externa)
+// Calcula o valor base dinâmico (XP e Kakera) usando os favoritos com variação aleatória de +/- 15%
+function getDynamicValue(favorites) {
+    let baseValue = Math.floor(favorites / 100) + 20;
+    const variation = Math.floor(baseValue * 0.15);
+    const randomOffset = Math.floor(Math.random() * (variation * 2 + 1)) - variation;
+    return baseValue + randomOffset;
+}
+
+// Raridade e Valores baseados em favoritos do Anilist
 function getRarity(favorites) {
-    if (favorites > 50000) return { name: '🟡 Lendária', color: '#FFD700', xp: 500 };
-    if (favorites > 20000) return { name: '🟣 Épica',    color: '#8A2BE2', xp: 250 };
-    if (favorites > 5000)  return { name: '🔵 Rara',     color: '#1E90FF', xp: 100 };
-    if (favorites > 1000)  return { name: '🟢 Incomum',  color: '#32CD32', xp: 50  };
-    return                        { name: '⚪ Comum',    color: '#b0b0b0', xp: 10  };
+    const value = getDynamicValue(favorites);
+    if (favorites > 50000) return { name: '🟡 Lendária', color: '#FFD700', xp: value };
+    if (favorites > 20000) return { name: '🟣 Épica',    color: '#8A2BE2', xp: value };
+    if (favorites > 5000)  return { name: '🔵 Rara',     color: '#1E90FF', xp: value };
+    if (favorites > 1000)  return { name: '🟢 Incomum',  color: '#32CD32', xp: value  };
+    return                        { name: '⚪ Comum',    color: '#b0b0b0', xp: value  };
 }
 
 async function checkLimits(guildId, userId) {
