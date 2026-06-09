@@ -216,8 +216,10 @@ module.exports = {
             });
 
         } catch (error) {
-            console.error('[ROLL ERROR]', error);
-            msg.edit('❌ Erro ao conectar com a API de animes. Tente novamente em instantes.');
+            console.error('[ROLL ERROR] Tipo:', error.constructor.name);
+            console.error('[ROLL ERROR] Mensagem:', error.message);
+            console.error('[ROLL ERROR] Stack:', error.stack);
+            msg.edit(`❌ Erro ao conectar com a API de animes. \`${error.message}\``);
         }
     }
 };
