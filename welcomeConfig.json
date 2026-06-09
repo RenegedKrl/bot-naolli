@@ -1,0 +1,14 @@
+{
+    "755077744047685672": {
+        "channelId": "755077744156606531",
+        "text": "Olá {user}, bem-vindo(a) ao {server}! \nAproveite e use o comando n!help",
+        "buttonUrl": "https://pinasstudio.netlify.app/",
+        "buttonLabel": "Meu Site"
+    },
+    "795126090430677032": {
+        "channelId": "795126090900307978",
+        "text": "Seja Bem Vindo {user} ao {server}, aproveite veja as <#797188955724054568>",
+        "buttonUrl": "https://pinasstudio.netlify.app/",
+        "buttonLabel": "Meu Site"
+    }
+}
