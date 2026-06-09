@@ -147,7 +147,33 @@ module.exports = {
             if (isClaimed) {
                 const owner = message.guild.members.cache.get(isClaimed.ownerId);
                 embed.addFields({ name: '💔 Já pertence a:', value: owner ? owner.user.username : 'Alguém' });
-                return msg.edit({ content: '', embeds: [embed] });
+                await msg.edit({ content: '', embeds: [embed] });
+
+                // Lógica da Reação de Kakera (Mudae-style)
+                const kakeraValue = rarity.xp; // Coincide perfeitamente: 500, 250, 100, 50, 10
+                await msg.react('💎');
+
+                const kakeraFilter = (reaction, user) => reaction.emoji.name === '💎' && !user.bot;
+                const kakeraCollector = msg.createReactionCollector({ filter: kakeraFilter, time: 30000, max: 1 });
+
+                kakeraCollector.on('collect', async (reaction, user) => {
+                    let kakeraConfig = await getData('kakeraConfig.json');
+                    if (!kakeraConfig[guildId]) kakeraConfig[guildId] = {};
+                    if (!kakeraConfig[guildId][user.id]) kakeraConfig[guildId][user.id] = { balance: 0, badges: [] };
+
+                    kakeraConfig[guildId][user.id].balance += kakeraValue;
+                    await saveData('kakeraConfig.json', kakeraConfig);
+
+                    message.channel.send(`💎 **${user.username}** reagiu primeiro e ganhou **${kakeraValue} Kakeras** do personagem repetido!`);
+                });
+
+                kakeraCollector.on('end', (collected, reason) => {
+                    if (reason !== 'limit') {
+                        msg.reactions.removeAll().catch(() => {});
+                    }
+                });
+
+                return;
             }
 
             await msg.edit({ content: '💖 Reaja para casar com este personagem!', embeds: [embed] });
