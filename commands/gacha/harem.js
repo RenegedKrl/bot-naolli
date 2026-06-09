@@ -50,12 +50,17 @@ module.exports = {
         async function showCharacter(currentIndex, listMsg, triggerMessage) {
             const getCharEmbed = (index) => {
                 const character = harem[index];
-                return new EmbedBuilder()
+                // Fallback para personagens antigos sem imageUrl
+                const rarityText = character.rarity ? `\n🌟 Raridade: **${character.rarity}**` : '';
+                const embed = new EmbedBuilder()
                     .setColor('#FF1493')
                     .setTitle(`${character.name}`)
-                    .setDescription(`**Anime:** ${character.anime}\n\n*Personagem ${index + 1} de ${harem.length}*`)
-                    .setImage(character.imageUrl)
+                    .setDescription(`**Anime:** ${character.anime}${rarityText}\n\n*Personagem ${index + 1} de ${harem.length}*`)
                     .setFooter({ text: `Pertence a: ${target.username}`, iconURL: target.displayAvatarURL({ dynamic: true }) });
+                if (character.imageUrl) {
+                    embed.setImage(character.imageUrl);
+                }
+                return embed;
             };
 
             const getButtons = (index) => {
