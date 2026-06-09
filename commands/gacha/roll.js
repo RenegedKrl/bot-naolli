@@ -51,7 +51,7 @@ async function fetchAnilistCharacter(genderFilter) {
                 id
                 name { full }
                 gender
-                favorites
+                favourites
                 image { large }
                 media(sort: POPULARITY_DESC, perPage: 1) {
                     nodes { title { romaji } }
@@ -119,7 +119,7 @@ module.exports = {
             const charName = character.name.full;
             const animeName = character.media.nodes[0]?.title?.romaji ?? 'Origem Desconhecida';
             const imageUrl  = character.image.large;
-            const favorites = character.favorites ?? 0;
+            const favorites = character.favourites ?? 0;
             const rarity    = getRarity(favorites);
 
             let config = await getData('gachaConfig.json');
