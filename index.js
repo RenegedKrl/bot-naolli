@@ -90,6 +90,31 @@ client.once('clientReady', () => {
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
 
+    // ================= AUTO-MODERAÇÃO =================
+    if (message.guild && message.member && !message.member.permissions.has('ManageMessages')) {
+        try {
+            const automodConfig = await getData('automodConfig.json') || {};
+            const cfg = automodConfig[message.guild.id];
+            if (cfg) {
+                const content = message.content.toLowerCase();
+                const hasBlockedWord = cfg.words?.some(w => content.includes(w));
+                const hasLink = cfg.antiLink && /https?:\/\/\S+/.test(content);
+
+                if (hasBlockedWord || hasLink) {
+                    await message.delete().catch(() => {});
+                    const reason = hasBlockedWord ? 'palavra proibida' : 'link não permitido';
+                    const warn = await message.channel.send(`⚠️ ${message.author}, sua mensagem foi removida (${reason}).`);
+                    setTimeout(() => warn.delete().catch(() => {}), 5000);
+                    if (cfg.warnChannel) {
+                        const ch = message.guild.channels.cache.get(cfg.warnChannel);
+                        ch?.send(`🚨 **AutoMod** | ${reason} detectado de <@${message.author.id}> em <#${message.channel.id}>\n> ${message.content.slice(0, 100)}`);
+                    }
+                    return;
+                }
+            }
+        } catch (e) { console.error('AutoMod error:', e.message); }
+    }
+
     // ================= SISTEMA DE NÍVEL / XP =================
     if (message.guild) {
         try {
@@ -186,6 +211,42 @@ client.on('messageCreate', async message => {
     } catch (error) {
         console.error(error);
         message.reply('❌ Ocorreu um erro ao tentar executar esse comando.');
+    }
+});
+
+// ================= INTERACTION HANDLER (Reaction Roles, etc.) =================
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton()) return;
+
+    const guildId = interaction.guild?.id;
+    const userId = interaction.user.id;
+
+    // ---- REACTION ROLES ----
+    if (interaction.customId.startsWith('rr_')) {
+        try {
+            const rrData = await getData('reactionRoles.json') || {};
+            const msgRoles = rrData[guildId]?.[interaction.message.id];
+            if (!msgRoles) return interaction.reply({ content: '❌ Painel desatualizado.', ephemeral: true });
+
+            const roleId = msgRoles[interaction.customId];
+            if (!roleId) return;
+
+            const role = interaction.guild.roles.cache.get(roleId);
+            if (!role) return interaction.reply({ content: '❌ Cargo não encontrado.', ephemeral: true });
+
+            const member = await interaction.guild.members.fetch(userId);
+            if (member.roles.cache.has(roleId)) {
+                await member.roles.remove(role);
+                await interaction.reply({ content: `✅ Cargo **${role.name}** removido!`, ephemeral: true });
+            } else {
+                await member.roles.add(role);
+                await interaction.reply({ content: `✅ Cargo **${role.name}** adicionado!`, ephemeral: true });
+            }
+        } catch (e) {
+            console.error('ReactionRole error:', e.message);
+            interaction.reply({ content: '❌ Erro ao gerenciar cargo.', ephemeral: true }).catch(() => {});
+        }
+        return;
     }
 });
 
