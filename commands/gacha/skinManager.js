@@ -91,4 +91,19 @@ async function enrichCache(anilistId, charName, defaultImageUrl) {
     await saveData('characterSkins.json', skinsConfig);
 }
 
-module.exports = { getCharacterSkin, RARITIES };
+async function getAllCharacterSkins(anilistId, charName, defaultImageUrl) {
+    let skinsConfig = await getData('characterSkins.json') || {};
+    
+    if (!skinsConfig[anilistId]) {
+        await enrichCache(anilistId, charName, defaultImageUrl);
+        skinsConfig = await getData('characterSkins.json') || {};
+    }
+    
+    if (skinsConfig[anilistId] && skinsConfig[anilistId].length > 0) {
+        return skinsConfig[anilistId];
+    }
+    
+    return [{ url: defaultImageUrl, rarity: '⚪ Comum' }];
+}
+
+module.exports = { getCharacterSkin, getAllCharacterSkins, RARITIES };

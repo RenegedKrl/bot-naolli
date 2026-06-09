@@ -1,5 +1,6 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { getData } = require('../../database');
+const { getAllCharacterSkins, RARITIES } = require('./skinManager');
 
 async function translateText(text) {
     if (!text) return text;
@@ -64,39 +65,80 @@ module.exports = {
             const animeName = character.media.nodes.length > 0 ? character.media.nodes[0].title.romaji : 'Origem Desconhecida';
             const imageUrl = character.image.large;
             
-            // Limpa formatação de markdown que a Anilist usa e corta o texto se for muito longo
             let rawDescription = character.description || '*Sem descrição disponível.*';
             rawDescription = rawDescription.replace(/__|<\/?i>|<\/?b>|~!|!~/g, '').replace(/<br>/g, '\n');
             if (rawDescription.length > 500) {
                 rawDescription = rawDescription.substring(0, 500) + '...';
             }
-            
             const translatedDescription = await translateText(rawDescription);
 
-            // Verifica quem é o dono no servidor atual
+            // Buscar peles/imagens
+            const skins = await getAllCharacterSkins(charId, charName, imageUrl);
+
             const guildId = message.guild.id;
             const gachaConfig = await getData('gachaConfig.json');
-            
             const isClaimed = gachaConfig[guildId] && gachaConfig[guildId][charId];
 
-            const embed = new EmbedBuilder()
-                .setTitle(`${charName}${nativeName}`)
-                .setURL(`https://anilist.co/character/${charId}`)
-                .setDescription(`**Anime/Mangá:** ${animeName}\n\n${translatedDescription}`)
-                .setImage(imageUrl)
-                .setFooter({ text: `ID: ${charId}` });
+            const getEmbed = (skinIndex) => {
+                const skin = skins[skinIndex];
+                const rarityColor = RARITIES[skin.rarity]?.color || '#00FF00';
+                
+                const embed = new EmbedBuilder()
+                    .setTitle(`${charName}${nativeName}`)
+                    .setURL(`https://anilist.co/character/${charId}`)
+                    .setDescription(`**Anime/Mangá:** ${animeName}\n\n${translatedDescription}`)
+                    .setImage(skin.url)
+                    .setFooter({ text: `ID: ${charId} • Imagem ${skinIndex + 1} de ${skins.length} (${skin.rarity})` });
 
-            if (isClaimed) {
-                embed.setColor('#FF0000'); // Vermelho = Alguém já tem
-                const owner = message.guild.members.cache.get(isClaimed.ownerId);
-                const ownerName = owner ? owner.user.username : 'Alguém desconhecido';
-                embed.addFields({ name: '💍 Pertence a:', value: `**${ownerName}**\nNeste servidor, apenas esta pessoa possui o personagem.` });
-            } else {
-                embed.setColor('#00FF00'); // Verde = Livre
-                embed.addFields({ name: '✨ Status:', value: 'Este personagem está **livre** no servidor! Role `n!w` para tentar pegá-lo.' });
+                if (isClaimed) {
+                    embed.setColor('#FF0000'); 
+                    const owner = message.guild.members.cache.get(isClaimed.ownerId);
+                    const ownerName = owner ? owner.user.username : 'Alguém desconhecido';
+                    embed.addFields({ name: '💍 Pertence a:', value: `**${ownerName}**\nNeste servidor, apenas esta pessoa possui o personagem.` });
+                } else {
+                    embed.setColor(rarityColor);
+                    embed.addFields({ name: '✨ Status:', value: 'Este personagem está **livre** no servidor! Role `n!w` para tentar pegá-lo.' });
+                }
+                
+                return embed;
+            };
+
+            const getButtons = (skinIndex) => {
+                if (skins.length <= 1) return [];
+                return [new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('prev_skin')
+                        .setLabel('⬅️ Anterior')
+                        .setStyle(ButtonStyle.Primary)
+                        .setDisabled(skinIndex === 0),
+                    new ButtonBuilder()
+                        .setCustomId('next_skin')
+                        .setLabel('Próxima ➡️')
+                        .setStyle(ButtonStyle.Primary)
+                        .setDisabled(skinIndex === skins.length - 1)
+                )];
+            };
+
+            let currentIndex = 0;
+            await msg.edit({ content: '', embeds: [getEmbed(currentIndex)], components: getButtons(currentIndex) });
+
+            if (skins.length > 1) {
+                const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120000 });
+
+                collector.on('collect', async (i) => {
+                    if (i.customId === 'prev_skin') currentIndex--;
+                    if (i.customId === 'next_skin') currentIndex++;
+
+                    await i.update({
+                        embeds: [getEmbed(currentIndex)],
+                        components: getButtons(currentIndex)
+                    });
+                });
+
+                collector.on('end', () => {
+                    msg.edit({ components: [] }).catch(() => {});
+                });
             }
-
-            await msg.edit({ content: '', embeds: [embed] });
 
         } catch (error) {
             console.error(error);
