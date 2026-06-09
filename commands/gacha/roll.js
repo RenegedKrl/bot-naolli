@@ -23,24 +23,37 @@ function getRarity(favorites) {
 
 async function checkLimits(guildId, userId) {
     const limits = await getData('gachaLimits.json');
+    const kakeraData = await getData('kakeraConfig.json');
     const key = `${guildId}_${userId}`;
+    
+    // Ler badges para aplicar buffs
+    let maxRolls = 10;
+    let rollCooldown = 6 * 60 * 60 * 1000;
+    let maxClaims = 1;
+
+    if (kakeraData && kakeraData[guildId] && kakeraData[guildId][userId] && kakeraData[guildId][userId].badges) {
+        const badges = kakeraData[guildId][userId].badges;
+        if (badges.includes('Bronze')) maxRolls += 3; // Bronze dá +3 Rolls
+        if (badges.includes('Prata')) rollCooldown -= (1 * 60 * 60 * 1000); // Prata reduz 1 hora
+    }
 
     if (!limits[key]) {
-        limits[key] = { rolls: 10, lastRollReset: Date.now(), claims: 1, lastClaimReset: Date.now() };
+        limits[key] = { rolls: maxRolls, lastRollReset: Date.now(), claims: maxClaims, lastClaimReset: Date.now() };
     }
 
     const now = Date.now();
-    if (now - limits[key].lastRollReset > SIX_HOURS) {
-        limits[key].rolls = 10;
+    if (now - limits[key].lastRollReset > rollCooldown) {
+        limits[key].rolls = maxRolls;
         limits[key].lastRollReset = now;
     }
-    if (now - limits[key].lastClaimReset > SIX_HOURS) {
-        limits[key].claims = 1;
+    // Claim é sempre 6 horas
+    if (now - limits[key].lastClaimReset > (6 * 60 * 60 * 1000)) {
+        limits[key].claims = maxClaims;
         limits[key].lastClaimReset = now;
     }
 
     await saveData('gachaLimits.json', limits);
-    return limits[key];
+    return { data: limits[key], maxRolls, rollCooldown };
 }
 
 async function updateLimits(guildId, userId, type, amount) {
@@ -95,9 +108,10 @@ module.exports = {
         const userId  = message.author.id;
 
         const userLimits = await checkLimits(guildId, userId);
+        const limitData = userLimits.data;
 
-        if (userLimits.rolls <= 0) {
-            const timeLeft = SIX_HOURS - (Date.now() - userLimits.lastRollReset);
+        if (limitData.rolls <= 0) {
+            const timeLeft = userLimits.rollCooldown - (Date.now() - limitData.lastRollReset);
             const hours   = Math.floor(timeLeft / 3600000);
             const minutes = Math.floor((timeLeft % 3600000) / 60000);
             return message.reply(`⏳ Você ficou sem rolls! Volte em **${hours}h e ${minutes}m**.`);
@@ -111,7 +125,7 @@ module.exports = {
         }
 
         await updateLimits(guildId, userId, 'rolls', 1);
-        const msg = await message.reply(`🎲 Rolando... (Restam **${userLimits.rolls - 1}** rolls)`);
+        const msg = await message.reply(`🎲 Rolando... (Restam **${limitData.rolls - 1}** rolls)`);
 
         try {
             // Tenta buscar até 3 vezes
@@ -142,8 +156,14 @@ module.exports = {
 
             const isClaimed = config[guildId][charId];
 
+            let embedColor = isClaimed ? '#FF0000' : rarity.color;
+            if (isClaimed && isClaimed.color) embedColor = isClaimed.color;
+
+            let footerText = `⭐ ${favorites.toLocaleString()} favoritos no Anilist`;
+            if (isClaimed && isClaimed.note) footerText = `📝 ${isClaimed.note} | ${footerText}`;
+
             const embed = new EmbedBuilder()
-                .setColor(isClaimed ? '#FF0000' : rarity.color)
+                .setColor(embedColor)
                 .setTitle(charName)
                 .setDescription(
                     `📺 **${animeName}**\n\n` +
@@ -151,7 +171,7 @@ module.exports = {
                     `🌐 Possuído em **${globalClaims}** servidor(es)`
                 )
                 .setImage(imageUrl)
-                .setFooter({ text: `⭐ ${favorites.toLocaleString()} favoritos no Anilist` });
+                .setFooter({ text: footerText });
 
             // Verifica se o personagem está na wishlist de alguém
             const wishes = await getData('wishes.json') || {};
@@ -165,13 +185,39 @@ module.exports = {
             }
             const wishText = wishPings.length > 0 ? `🌟 Desejo de: ${wishPings.join(', ')}\n` : '';
 
+            // Valor base em kakera
+            const kakeraValue = rarity.xp; 
+
             if (isClaimed) {
                 const owner = message.guild.members.cache.get(isClaimed.ownerId);
+
+                // Sistema de Chaves (Keys) - Se quem roletou já é o dono
+                if (isClaimed.ownerId === userId) {
+                    let kakeraConfig = await getData('kakeraConfig.json');
+                    if (!kakeraConfig[guildId]) kakeraConfig[guildId] = {};
+                    if (!kakeraConfig[guildId][userId]) kakeraConfig[guildId][userId] = { balance: 0, badges: [] };
+
+                    // Inicializa chaves se não tiver
+                    if (!config[guildId][charId].keys) config[guildId][charId].keys = 0;
+                    
+                    config[guildId][charId].keys += 1;
+                    const keyCount = config[guildId][charId].keys;
+                    
+                    // Aumenta o valor do personagem em 10% para cada chave
+                    config[guildId][charId].value = Math.floor(config[guildId][charId].value * 1.1);
+                    await saveData('gachaConfig.json', config);
+
+                    kakeraConfig[guildId][userId].balance += kakeraValue;
+                    await saveData('kakeraConfig.json', kakeraConfig);
+
+                    embed.addFields({ name: '🔑 Chave Adquirida!', value: `Você roletou um personagem que já possui!\nNível da Chave: **${keyCount}** (+10% valor)\n💎 Ganhou **${kakeraValue} Kakeras** de bônus.` });
+                    return msg.edit({ content: wishText, embeds: [embed] });
+                }
+
                 embed.addFields({ name: '💔 Já pertence a:', value: owner ? owner.user.username : 'Alguém' });
                 await msg.edit({ content: wishText, embeds: [embed] });
 
-                // Lógica da Reação de Kakera (Mudae-style)
-                const kakeraValue = rarity.xp; // Coincide perfeitamente: 500, 250, 100, 50, 10
+                // Lógica da Reação de Kakera (Mudae-style) para quando OUTRA pessoa for o dono
                 await msg.react('💎');
 
                 const kakeraFilter = (reaction, user) => reaction.emoji.name === '💎' && !user.bot;
@@ -204,7 +250,8 @@ module.exports = {
             const collector = msg.createReactionCollector({ filter, time: 45000 });
 
             collector.on('collect', async (reaction, user) => {
-                const clickerLimits = await checkLimits(guildId, user.id);
+                const clickerLimitsRaw = await checkLimits(guildId, user.id);
+                const clickerLimits = clickerLimitsRaw.data;
                 if (clickerLimits.claims <= 0) {
                     message.channel.send(`❌ ${user}, você já se casou nas últimas 6 horas!`);
                     return reaction.users.remove(user.id).catch(() => {});

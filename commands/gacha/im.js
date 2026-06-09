@@ -81,17 +81,25 @@ module.exports = {
 
             const getEmbed = (skinIndex) => {
                 const skin = skins[skinIndex];
-                const rarityColor = RARITIES[skin.rarity]?.color || '#00FF00';
+                let rarityColor = RARITIES[skin.rarity]?.color || '#00FF00';
                 
+                // Aplica cor customizada se o dono tiver comprado
+                if (isClaimed && isClaimed.color) {
+                    rarityColor = isClaimed.color;
+                }
+
+                let footerText = `ID: ${charId} • Imagem ${skinIndex + 1} de ${skins.length} (${skin.rarity})`;
+                if (isClaimed && isClaimed.note) footerText = `📝 ${isClaimed.note} | ${footerText}`;
+
                 const embed = new EmbedBuilder()
                     .setTitle(`${charName}${nativeName}`)
                     .setURL(`https://anilist.co/character/${charId}`)
                     .setDescription(`**Anime/Mangá:** ${animeName}\n\n${translatedDescription}`)
                     .setImage(skin.url)
-                    .setFooter({ text: `ID: ${charId} • Imagem ${skinIndex + 1} de ${skins.length} (${skin.rarity})` });
+                    .setFooter({ text: footerText });
 
                 if (isClaimed) {
-                    embed.setColor('#FF0000'); 
+                    embed.setColor(rarityColor); 
                     const owner = message.guild.members.cache.get(isClaimed.ownerId);
                     const ownerName = owner ? owner.user.username : 'Alguém desconhecido';
                     embed.addFields({ name: '💍 Pertence a:', value: `**${ownerName}**\nNeste servidor, apenas esta pessoa possui o personagem.` });
