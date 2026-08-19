@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for bot-naolli on 2026-08-19T03:52:55Z
+# fly.toml app configuration file generated for bot-naolli-t3xy3g on 2026-08-19T12:56:37Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'bot-naolli'
+app = 'bot-naolli-t3xy3g'
 primary_region = 'ams'
 
 [build]
