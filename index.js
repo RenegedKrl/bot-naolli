@@ -510,7 +510,14 @@ setInterval(async () => {
 
             let liveMatches = [], pastMatches = [], newsItems = [];
 
-            if (hasMatchGuilds) liveMatches = await psGet(game, 'matches/running?per_page=10&sort=begin_at');
+            if (hasMatchGuilds) {
+                const rawLive = await psGet(game, 'matches/running?per_page=10&sort=begin_at');
+                liveMatches = rawLive.filter(m => {
+                    const beginAt = new Date(m.begin_at || m.modified_at || Date.now()).getTime();
+                    // Ignora partidas "presas" na API que começaram há mais de 12 horas
+                    return (Date.now() - beginAt) < 43200000; 
+                });
+            }
             if (hasResultGuilds) pastMatches = await psGet(game, 'matches/past?sort=-modified_at&per_page=15');
             
             if (hasNewsGuilds) {

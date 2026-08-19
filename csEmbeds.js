@@ -60,7 +60,11 @@ async function sendMatchEmbed(channel, match, type, game = 'csgo') {
             .setAuthor({ name: authorName, iconURL: iconUrl })
             .setTitle(`${flag1} ${team1.name} vs ${team2.name} ${flag2}`)
             .setURL(matchUrl)
-            .setDescription(`🔴 Ao Vivo <t:${matchTimeUnix}:R>`)
+            .setDescription(
+                matchTimeUnix > Math.floor(Date.now() / 1000) 
+                    ? `⏳ Começa <t:${matchTimeUnix}:R>` 
+                    : `🔴 Ao Vivo <t:${matchTimeUnix}:R>`
+            )
             .addFields(
                 { name: 'Evento', value: event, inline: true },
                 { name: 'Formato', value: format, inline: true }
